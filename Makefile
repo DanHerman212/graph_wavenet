@@ -60,11 +60,14 @@ deploy-ingestion:
 	@echo "Deploying poller code to VM..."
 	# Copy poller code to user's home directory first (no root needed)
 	gcloud compute scp --recurse $(POLLER_DIR)/* $(VM_NAME):~/poller-staging/ --zone=$(ZONE)
-	# Move files to /opt with sudo, install dependencies, and start service
+	# Ensure directory exists, create venv if needed, move files, install deps, start service
 	gcloud compute ssh $(VM_NAME) --zone=$(ZONE) --command="\
+		sudo mkdir -p /opt/gtfs-poller && \
 		sudo cp -r ~/poller-staging/* /opt/gtfs-poller/ && \
 		rm -rf ~/poller-staging && \
 		cd /opt/gtfs-poller && \
+		[ -d venv ] || sudo python3 -m venv venv && \
+		sudo chown -R \$$(id -u):\$$(id -g) venv && \
 		source venv/bin/activate && \
 		pip install -q -r requirements.txt && \
 		sudo systemctl restart gtfs-poller && \
@@ -103,7 +106,8 @@ deploy-dataflow:
 		--temp_location=gs://$(TEMP_BUCKET)/temp \
 		--staging_location=gs://$(STAGING_BUCKET)/staging \
 		--service_account_email=$(SERVICE_ACCOUNT) \
-		--worker_zone=us-east1-b \
+		--machine_type=e2-medium \
+		--max_num_workers=2 \
 		--gtfs_subscription=projects/$(PROJECT_ID)/subscriptions/gtfs-rt-ace-dataflow \
 		--alerts_subscription=projects/$(PROJECT_ID)/subscriptions/service-alerts-dataflow \
 		--output_table=$(PROJECT_ID):subway.vehicle_positions \
