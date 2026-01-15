@@ -14,11 +14,23 @@ resource "google_bigquery_dataset" "subway" {
     project     = "graph-wavenet"
   }
 
+  # Grant special group access for project owners/editors
   access {
     role          = "OWNER"
-    user_by_email = google_service_account.dataflow.email
+    special_group = "projectOwners"
   }
 
+  access {
+    role          = "WRITER"
+    special_group = "projectWriters"
+  }
+
+  access {
+    role          = "READER"
+    special_group = "projectReaders"
+  }
+
+  # Dataflow service account needs write access
   access {
     role          = "WRITER"
     user_by_email = google_service_account.dataflow.email

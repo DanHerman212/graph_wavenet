@@ -47,9 +47,9 @@ output "bigquery_dataset_id" {
   value       = google_bigquery_dataset.subway.dataset_id
 }
 
-output "sensor_data_table_id" {
-  description = "Full table ID for sensor data"
-  value       = "${google_bigquery_dataset.subway.project}:${google_bigquery_dataset.subway.dataset_id}.${google_bigquery_table.sensor_data.table_id}"
+output "vehicle_positions_table_id" {
+  description = "Full table ID for vehicle positions"
+  value       = "${google_bigquery_dataset.subway.project}:${google_bigquery_dataset.subway.dataset_id}.${google_bigquery_table.vehicle_positions.table_id}"
 }
 
 output "service_alerts_table_id" {
@@ -102,7 +102,7 @@ output "connection_config" {
     gtfs_topic      = google_pubsub_topic.gtfs_rt.id
     alerts_topic    = google_pubsub_topic.service_alerts.id
     project_id      = var.project_id
-    bigquery_table  = "${var.project_id}:${google_bigquery_dataset.subway.dataset_id}.${google_bigquery_table.sensor_data.table_id}"
+    vehicle_positions_table = "${var.project_id}:${google_bigquery_dataset.subway.dataset_id}.${google_bigquery_table.vehicle_positions.table_id}"
     alerts_table    = "${var.project_id}:${google_bigquery_dataset.subway.dataset_id}.${google_bigquery_table.service_alerts.table_id}"
   }
 }

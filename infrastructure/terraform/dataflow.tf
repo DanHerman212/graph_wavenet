@@ -69,7 +69,7 @@ output "dataflow_launch_command" {
       --machine_type=${var.dataflow_machine_type} \
       --gtfs_subscription=projects/${var.project_id}/subscriptions/${google_pubsub_subscription.gtfs_rt.name} \
       --alerts_subscription=projects/${var.project_id}/subscriptions/${google_pubsub_subscription.service_alerts.name} \
-      --sensor_table=${var.project_id}:${google_bigquery_dataset.subway.dataset_id}.${google_bigquery_table.sensor_data.table_id} \
+      --output_table=${var.project_id}:${google_bigquery_dataset.subway.dataset_id}.${google_bigquery_table.vehicle_positions.table_id} \
       --alerts_table=${var.project_id}:${google_bigquery_dataset.subway.dataset_id}.${google_bigquery_table.service_alerts.table_id} \
       --streaming
   CMD
