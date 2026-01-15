@@ -90,13 +90,19 @@ deploy-dataflow:
 	@echo "Launching Dataflow streaming pipeline..."
 	@# Get project ID from terraform
 	$(eval PROJECT_ID := $(shell cd $(TF_DIR) && terraform output -raw project_id 2>/dev/null))
+	$(eval SERVICE_ACCOUNT := $(shell cd $(TF_DIR) && terraform output -raw dataflow_service_account 2>/dev/null))
+	$(eval TEMP_BUCKET := $(shell cd $(TF_DIR) && terraform output -raw dataflow_temp_bucket 2>/dev/null))
+	$(eval STAGING_BUCKET := $(shell cd $(TF_DIR) && terraform output -raw dataflow_staging_bucket 2>/dev/null))
 	@if [ -z "$(PROJECT_ID)" ]; then echo "Error: Run 'make deploy-infra' first"; exit 1; fi
-	cd $(DATAFLOW_DIR) && python pipeline.py \
+	cd $(DATAFLOW_DIR) && python3 pipeline.py \
 		--project=$(PROJECT_ID) \
 		--region=us-east1 \
 		--runner=DataflowRunner \
 		--streaming \
 		--job_name=subway-ingestion \
+		--temp_location=gs://$(TEMP_BUCKET)/temp \
+		--staging_location=gs://$(STAGING_BUCKET)/staging \
+		--service_account_email=$(SERVICE_ACCOUNT) \
 		--gtfs_subscription=projects/$(PROJECT_ID)/subscriptions/gtfs-rt-ace-dataflow \
 		--alerts_subscription=projects/$(PROJECT_ID)/subscriptions/service-alerts-dataflow \
 		--output_table=$(PROJECT_ID):subway.vehicle_positions \
@@ -120,7 +126,7 @@ ssh:
 	gcloud compute ssh $(VM_NAME) --zone=$(ZONE)
 
 logs:
-	gcloud compute ssh $(VM_NAME) --zone=$(ZONE) --command="sudo journalctl -u gtfs-poller -f"
+	gcloud compute ssh $(VM_NAME) --zone=$(ZONE) --command="tail -f /var/log/gtfs-poller/stderr.log"
 
 status:
 	@echo "=== Infrastructure ==="
