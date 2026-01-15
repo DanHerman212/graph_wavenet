@@ -106,6 +106,7 @@ deploy-dataflow:
 		--temp_location=gs://$(TEMP_BUCKET)/temp \
 		--staging_location=gs://$(STAGING_BUCKET)/staging \
 		--service_account_email=$(SERVICE_ACCOUNT) \
+		--setup_file=./setup.py \
 		--machine_type=e2-medium \
 		--max_num_workers=2 \
 		--gtfs_subscription=projects/$(PROJECT_ID)/subscriptions/gtfs-rt-ace-dataflow \
