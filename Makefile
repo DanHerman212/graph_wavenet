@@ -58,10 +58,12 @@ teardown:
 
 deploy-ingestion:
 	@echo "Deploying poller code to VM..."
-	# Copy poller code to VM
-	gcloud compute scp --recurse $(POLLER_DIR)/* $(VM_NAME):/opt/gtfs-poller/ --zone=$(ZONE)
-	# Install dependencies and start service
+	# Copy poller code to user's home directory first (no root needed)
+	gcloud compute scp --recurse $(POLLER_DIR)/* $(VM_NAME):~/poller-staging/ --zone=$(ZONE)
+	# Move files to /opt with sudo, install dependencies, and start service
 	gcloud compute ssh $(VM_NAME) --zone=$(ZONE) --command="\
+		sudo cp -r ~/poller-staging/* /opt/gtfs-poller/ && \
+		rm -rf ~/poller-staging && \
 		cd /opt/gtfs-poller && \
 		source venv/bin/activate && \
 		pip install -q -r requirements.txt && \
