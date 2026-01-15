@@ -2,6 +2,21 @@
 
 A deep learning system for predicting train headways on the NYC Subway A, C, E lines using spatial-temporal graph neural networks.
 
+## Table of Contents
+
+- [Project Overview](#project-overview)
+  - [Phase 1: Define the Prediction Task](#phase-1-define-the-prediction-task)
+  - [Phase 2: Create a Data Representation](#phase-2-create-a-data-representation)
+  - [Phase 3: Build Graph WaveNet Architecture](#phase-3-build-graph-wavenet-architecture)
+  - [Phase 4: Deploy to Production](#phase-4-deploy-to-production)
+  - [Phase 5: Command Center UI](#phase-5-command-center-ui)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Data Schema](#data-schema)
+- [License](#license)
+
+---
+
 ## Project Overview
 
 This project builds an end-to-end machine learning system for real-time subway headway prediction, from data ingestion through model deployment and monitoring.
