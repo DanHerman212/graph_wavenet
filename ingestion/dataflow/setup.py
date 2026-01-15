@@ -12,6 +12,6 @@ setuptools.setup(
     description='NYC Subway GTFS-RT ingestion pipeline',
     packages=setuptools.find_packages(),
     install_requires=[
-        'apache-beam[gcp]>=2.50.0',
+        'apache-beam[gcp]>=2.61.0',
     ],
 )
