@@ -1,0 +1,21 @@
+# Terraform variables for NYC Subway Pipeline
+# Copy this file to terraform.tfvars and fill in your values
+#
+# Usage:
+#   cp terraform.tfvars.example terraform.tfvars
+#   # Edit terraform.tfvars with your project ID
+#   terraform init
+#   terraform apply
+
+# Required - your GCP project ID
+project_id = "your-gcp-project-id"
+
+# Optional - defaults shown (uncomment to override)
+# region                = "us-east1"
+# zone                  = "us-east1-b"
+# environment           = "dev"
+# poller_machine_type   = "e2-small"
+# dataflow_machine_type = "n1-standard-1"
+# dataflow_max_workers  = 2
+# bigquery_dataset_id   = "subway"
+# retention_days        = 90

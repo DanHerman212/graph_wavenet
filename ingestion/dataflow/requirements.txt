@@ -1,0 +1,6 @@
+# Requirements for Dataflow Pipeline
+
+apache-beam[gcp]>=2.52.0
+google-cloud-pubsub>=2.18.0
+google-cloud-bigquery>=3.13.0
+protobuf>=4.24.0

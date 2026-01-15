@@ -1,0 +1,5 @@
+# Poller dependencies - fetch, parse protobuf to JSON, publish
+google-cloud-pubsub>=2.18.0
+requests>=2.31.0
+gtfs-realtime-bindings>=1.0.0
+protobuf>=4.24.0
