@@ -1,8 +1,8 @@
 """
 GTFS-RT Poller for NYC Subway
 
-Fetches GTFS-RT protobuf data from MTA, converts to JSON,
-and publishes to Pub/Sub.
+Fetches GTFS-RT protobuf data from MTA, extracts track information
+from MTA extensions, converts to JSON, and publishes to Pub/Sub.
 
 Supports multiple feeds (ACE, BDFM, etc.) via feed_url and feed_id parameters.
 """
@@ -11,12 +11,14 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import requests
 from google.cloud import pubsub_v1
-from google.protobuf.json_format import MessageToDict
-from google.transit import gtfs_realtime_pb2
+
+# Import compiled protobuf modules with MTA extensions
+import gtfs_realtime_pb2
+import nyct_subway_pb2
 
 from config import Config, get_config
 
@@ -64,15 +66,91 @@ class GTFSPoller:
         return None
 
     def protobuf_to_json(self, data: bytes) -> Optional[str]:
-        """Convert GTFS-RT protobuf to JSON string."""
+        """Convert GTFS-RT protobuf to JSON, extracting MTA extension fields."""
         try:
             feed = gtfs_realtime_pb2.FeedMessage()
             feed.ParseFromString(data)
-            feed_dict = MessageToDict(feed, preserving_proto_field_name=True)
-            feed_dict["_ingest_time"] = datetime.now(timezone.utc).isoformat()
+            
+            # Build JSON structure manually to include extension fields
+            feed_dict = {
+                "header": {
+                    "gtfs_realtime_version": feed.header.gtfs_realtime_version,
+                    "timestamp": feed.header.timestamp,
+                },
+                "entity": [],
+                "_ingest_time": datetime.now(timezone.utc).isoformat()
+            }
+            
+            # Process each entity
+            for entity in feed.entity:
+                entity_dict = {"id": entity.id}
+                
+                # Handle trip updates
+                if entity.HasField('trip_update'):
+                    trip_update = entity.trip_update
+                    trip_dict = {
+                        "trip_id": trip_update.trip.trip_id,
+                        "route_id": trip_update.trip.route_id if trip_update.trip.HasField('route_id') else None,
+                        "start_time": trip_update.trip.start_time if trip_update.trip.HasField('start_time') else None,
+                        "start_date": trip_update.trip.start_date if trip_update.trip.HasField('start_date') else None,
+                    }
+                    
+                    # Extract NYCT trip extension
+                    if trip_update.trip.HasExtension(nyct_subway_pb2.nyct_trip_descriptor):
+                        nyct_trip = trip_update.trip.Extensions[nyct_subway_pb2.nyct_trip_descriptor]
+                        trip_dict["train_id"] = nyct_trip.train_id if nyct_trip.HasField('train_id') else None
+                        trip_dict["direction"] = nyct_trip.Direction.Name(nyct_trip.direction) if nyct_trip.HasField('direction') else None
+                    
+                    # Process stop time updates
+                    stop_time_updates = []
+                    for stop_update in trip_update.stop_time_update:
+                        stop_dict = {
+                            "stop_id": stop_update.stop_id,
+                            "stop_sequence": stop_update.stop_sequence if stop_update.HasField('stop_sequence') else None,
+                        }
+                        
+                        # Add arrival/departure times
+                        if stop_update.HasField('arrival'):
+                            stop_dict["arrival"] = {
+                                "time": stop_update.arrival.time if stop_update.arrival.HasField('time') else None
+                            }
+                        if stop_update.HasField('departure'):
+                            stop_dict["departure"] = {
+                                "time": stop_update.departure.time if stop_update.departure.HasField('time') else None
+                            }
+                        
+                        # Extract NYCT stop time extension (track data)
+                        if stop_update.HasExtension(nyct_subway_pb2.nyct_stop_time_update):
+                            nyct_stop = stop_update.Extensions[nyct_subway_pb2.nyct_stop_time_update]
+                            stop_dict["scheduled_track"] = nyct_stop.scheduled_track if nyct_stop.HasField('scheduled_track') else None
+                            stop_dict["actual_track"] = nyct_stop.actual_track if nyct_stop.HasField('actual_track') else None
+                        
+                        stop_time_updates.append(stop_dict)
+                    
+                    trip_dict["stop_time_update"] = stop_time_updates
+                    entity_dict["trip_update"] = {"trip": trip_dict}
+                
+                # Handle vehicle positions (if present)
+                elif entity.HasField('vehicle'):
+                    vehicle = entity.vehicle
+                    vehicle_dict = {
+                        "trip": {
+                            "trip_id": vehicle.trip.trip_id if vehicle.trip.HasField('trip_id') else None,
+                            "route_id": vehicle.trip.route_id if vehicle.trip.HasField('route_id') else None,
+                        },
+                        "current_stop_sequence": vehicle.current_stop_sequence if vehicle.HasField('current_stop_sequence') else None,
+                        "stop_id": vehicle.stop_id if vehicle.HasField('stop_id') else None,
+                        "current_status": vehicle.VehicleStopStatus.Name(vehicle.current_status) if vehicle.HasField('current_status') else None,
+                        "timestamp": vehicle.timestamp if vehicle.HasField('timestamp') else None,
+                    }
+                    entity_dict["vehicle"] = vehicle_dict
+                
+                feed_dict["entity"].append(entity_dict)
+            
             return json.dumps(feed_dict)
+            
         except Exception as e:
-            logger.error(f"Failed to parse protobuf: {e}")
+            logger.error(f"Failed to parse protobuf: {e}", exc_info=True)
             return None
 
     def publish(self, json_data: str) -> bool:

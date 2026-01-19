@@ -20,6 +20,12 @@ VEHICLE_POSITIONS_SCHEMA = {
         {"name": "direction", "type": "STRING", "mode": "REQUIRED"},  # N or S
         {"name": "path_id", "type": "STRING", "mode": "NULLABLE"},    # e.g., "55R"
         
+        # MTA Extension Fields - Track Information
+        {"name": "train_id", "type": "STRING", "mode": "NULLABLE"},        # Physical train identifier
+        {"name": "nyct_direction", "type": "STRING", "mode": "NULLABLE"},  # NORTH, SOUTH, EAST, WEST
+        {"name": "scheduled_track", "type": "STRING", "mode": "NULLABLE"}, # Pre-planned track (e.g., "F3")
+        {"name": "actual_track", "type": "STRING", "mode": "NULLABLE"},    # Real-time track assignment (e.g., "F3")
+        
         # Current position
         {"name": "stop_id", "type": "STRING", "mode": "REQUIRED"},
         {"name": "current_stop_sequence", "type": "INTEGER", "mode": "NULLABLE"},

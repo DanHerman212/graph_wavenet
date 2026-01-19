@@ -131,6 +131,10 @@ class ExtractVehiclePositions(beam.DoFn):
                 # Parse direction and path from trip_id
                 parsed = parse_trip_id(trip_id)
                 
+                # Extract MTA extension fields (added by poller)
+                train_id = trip.get("train_id")
+                nyct_direction = trip.get("direction")  # NORTH/SOUTH/EAST/WEST from extension
+                
                 # Build output record
                 record = {
                     "entity_id": entity.get("id"),
@@ -140,6 +144,10 @@ class ExtractVehiclePositions(beam.DoFn):
                     "start_date": trip.get("start_date"),
                     "direction": parsed["direction"],
                     "path_id": parsed["path_id"],
+                    "train_id": train_id,
+                    "nyct_direction": nyct_direction,
+                    "scheduled_track": None,  # Available in trip_update, not vehicle
+                    "actual_track": None,     # Available in trip_update, not vehicle
                     "stop_id": stop_id,
                     "current_stop_sequence": vehicle.get("current_stop_sequence"),
                     "current_status": vehicle.get("current_status"),

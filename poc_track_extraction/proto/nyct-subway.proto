@@ -1,0 +1,48 @@
+// MTA NYCT Subway extensions to GTFS-realtime
+// https://api.mta.info/#/subwayRealTimeFeeds
+
+syntax = "proto2";
+
+import "gtfs-realtime.proto";
+
+option java_package = "com.google.transit.realtime";
+
+message TripReplacementPeriod {
+  optional string route_id = 1;
+  optional transit_realtime.TimeRange replacement_period = 2;
+}
+
+message NyctFeedHeader {
+  required string nyct_subway_version = 1;
+  repeated TripReplacementPeriod trip_replacement_period = 2;
+}
+
+extend transit_realtime.FeedHeader {
+  optional NyctFeedHeader nyct_feed_header = 1001;
+}
+
+message NyctTripDescriptor {
+  optional string train_id = 1;
+  optional bool is_assigned = 2;
+  
+  enum Direction {
+    NORTH = 1;
+    EAST = 2;
+    SOUTH = 3;
+    WEST = 4;
+  }
+  optional Direction direction = 3;
+}
+
+extend transit_realtime.TripDescriptor {
+  optional NyctTripDescriptor nyct_trip_descriptor = 1001;
+}
+
+message NyctStopTimeUpdate {
+  optional string scheduled_track = 1;
+  optional string actual_track = 2;
+}
+
+extend transit_realtime.TripUpdate.StopTimeUpdate {
+  optional NyctStopTimeUpdate nyct_stop_time_update = 1001;
+}
