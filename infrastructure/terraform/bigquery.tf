@@ -98,6 +98,30 @@ resource "google_bigquery_table" "vehicle_positions" {
       description = "Path identifier extracted from trip_id (e.g., 55R)"
     },
     {
+      name        = "train_id"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Physical train identifier from MTA extension"
+    },
+    {
+      name        = "nyct_direction"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Cardinal direction from MTA extension (NORTH, SOUTH, EAST, WEST)"
+    },
+    {
+      name        = "scheduled_track"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Pre-planned track assignment (e.g., F3, A2)"
+    },
+    {
+      name        = "actual_track"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Real-time track assignment from MTA extension (e.g., F3, A2)"
+    },
+    {
       name        = "stop_id"
       type        = "STRING"
       mode        = "REQUIRED"

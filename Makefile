@@ -19,12 +19,12 @@ help:
 	@echo "  make deploy-infra    - Create GCP resources (Pub/Sub, BigQuery, VM)"
 	@echo "  make teardown        - Destroy all GCP resources"
 	@echo ""
-	@echo "Ingestion:"
+	@echo "Ingestion (with track_id extraction):"
 	@echo "  make deploy-ingestion - Deploy and start pollers on VM"
 	@echo "  make stop-ingestion   - Stop pollers on VM"
 	@echo "  make restart-ingestion - Restart pollers on VM"
 	@echo ""
-	@echo "Dataflow:"
+	@echo "Dataflow (processes track_id fields):"
 	@echo "  make deploy-dataflow  - Launch Dataflow streaming pipeline"
 	@echo "  make stop-dataflow    - Cancel Dataflow job"
 	@echo ""
@@ -32,6 +32,7 @@ help:
 	@echo "  make ssh              - SSH into poller VM"
 	@echo "  make logs             - View poller logs on VM"
 	@echo "  make status           - Check status of all services"
+	@echo "  make verify-tracks    - Verify track_id data in BigQuery"
 
 # =============================================================================
 # Infrastructure
@@ -57,10 +58,10 @@ teardown:
 # =============================================================================
 
 deploy-ingestion:
-	@echo "Deploying poller code to VM..."
+	@echo "Deploying poller code to VM (with protobuf track extraction)..."
 	# Copy poller code to user's home directory first (no root needed)
 	gcloud compute scp --recurse $(POLLER_DIR)/* $(VM_NAME):~/poller-staging/ --zone=$(ZONE)
-	# Ensure directory exists, create venv if needed, move files, install deps, start service
+	# Ensure directory exists, create venv if needed, move files, install deps (protobuf v6), start service
 	gcloud compute ssh $(VM_NAME) --zone=$(ZONE) --command="\
 		sudo mkdir -p /opt/gtfs-poller && \
 		sudo cp -r ~/poller-staging/* /opt/gtfs-poller/ && \
@@ -73,7 +74,9 @@ deploy-ingestion:
 		sudo systemctl restart gtfs-poller && \
 		sudo systemctl status gtfs-poller --no-pager"
 	@echo ""
-	@echo "Ingestion deployed and running. Use 'make logs' to view output."
+	@echo "✓ Poller deployed with track_id extraction enabled"
+	@echo "  - Capturing: actual_track, scheduled_track, train_id, direction"
+	@echo "  - Use 'make logs' to verify track data is being extracted"
 
 stop-ingestion:
 	@echo "Stopping pollers..."
@@ -90,7 +93,7 @@ restart-ingestion:
 # =============================================================================
 
 deploy-dataflow:
-	@echo "Launching Dataflow streaming pipeline..."
+	@echo "Launching Dataflow streaming pipeline (with track_id support)..."
 	@# Get project ID from terraform
 	$(eval PROJECT_ID := $(shell cd $(TF_DIR) && terraform output -raw project_id 2>/dev/null))
 	$(eval SERVICE_ACCOUNT := $(shell cd $(TF_DIR) && terraform output -raw dataflow_service_account 2>/dev/null))
@@ -102,7 +105,7 @@ deploy-dataflow:
 		--region=us-east1 \
 		--runner=DataflowRunner \
 		--streaming \
-		--job_name=subway-ingestion \
+		--job_name=subway-ingestion-track-enhanced \
 		--temp_location=gs://$(TEMP_BUCKET)/temp \
 		--staging_location=gs://$(STAGING_BUCKET)/staging \
 		--service_account_email=$(SERVICE_ACCOUNT) \
@@ -115,12 +118,14 @@ deploy-dataflow:
 		--output_table=$(PROJECT_ID):subway.vehicle_positions \
 		--alerts_table=$(PROJECT_ID):subway.service_alerts
 	@echo ""
-	@echo "Dataflow job launched. View at: https://console.cloud.google.com/dataflow/jobs"
+	@echo "✓ Dataflow job launched with track_id fields"
+	@echo "  View at: https://console.cloud.google.com/dataflow/jobs"
+	@echo "  New fields: train_id, nyct_direction, scheduled_track, actual_track"
 
 stop-dataflow:
 	@echo "Cancelling Dataflow job..."
 	$(eval PROJECT_ID := $(shell cd $(TF_DIR) && terraform output -raw project_id 2>/dev/null))
-	gcloud dataflow jobs list --filter="name=subway-ingestion AND state=Running" \
+	gcloud dataflow jobs list --filter="name:subway-ingestion AND state=Running" \
 		--format="value(id)" --region=us-east1 | \
 		xargs -I {} gcloud dataflow jobs cancel {} --region=us-east1
 	@echo "Dataflow job cancelled."
@@ -144,3 +149,27 @@ status:
 	@echo ""
 	@echo "=== Dataflow Jobs ==="
 	@gcloud dataflow jobs list --filter="state=Running" --region=us-east1 --format="table(name,state,createTime)" 2>/dev/null || echo "None"
+verify-tracks:
+	@echo "Verifying track_id data in BigQuery..."
+	$(eval PROJECT_ID := $(shell cd $(TF_DIR) && terraform output -raw project_id 2>/dev/null))
+	@if [ -z "$(PROJECT_ID)" ]; then echo "Error: Infrastructure not deployed"; exit 1; fi
+	@echo ""
+	@echo "Sample records with track_id:"
+	bq query --use_legacy_sql=false --format=pretty --max_rows=10 \
+		"SELECT trip_id, stop_id, actual_track, scheduled_track, train_id, \
+		 nyct_direction, vehicle_timestamp \
+		 FROM $(PROJECT_ID).subway.vehicle_positions \
+		 WHERE actual_track IS NOT NULL \
+		 ORDER BY vehicle_timestamp DESC \
+		 LIMIT 10"
+	@echo ""
+	@echo "Track coverage statistics:"
+	bq query --use_legacy_sql=false --format=pretty \
+		"SELECT \
+		   COUNT(*) as total_records, \
+		   COUNTIF(actual_track IS NOT NULL) as with_actual_track, \
+		   COUNTIF(scheduled_track IS NOT NULL) as with_scheduled_track, \
+		   COUNTIF(train_id IS NOT NULL) as with_train_id, \
+		   ROUND(100.0 * COUNTIF(actual_track IS NOT NULL) / COUNT(*), 1) as track_coverage_pct \
+		 FROM $(PROJECT_ID).subway.vehicle_positions \
+		 WHERE DATE(vehicle_timestamp) = CURRENT_DATE()"
