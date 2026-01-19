@@ -127,8 +127,11 @@ class GTFSPoller:
                         
                         stop_time_updates.append(stop_dict)
                     
-                    trip_dict["stop_time_update"] = stop_time_updates
-                    entity_dict["trip_update"] = {"trip": trip_dict}
+                    # Build trip_update structure with stop_time_update at correct level
+                    entity_dict["trip_update"] = {
+                        "trip": trip_dict,
+                        "stop_time_update": stop_time_updates
+                    }
                 
                 # Handle vehicle positions (if present)
                 elif entity.HasField('vehicle'):

@@ -165,6 +165,235 @@ resource "google_bigquery_table" "vehicle_positions" {
   }
 }
 
+# =============================================================================
+# TEST TABLE - Vehicle positions with stateful track enrichment
+# =============================================================================
+
+# Test table for enriched vehicle positions
+resource "google_bigquery_table" "vehicle_positions_enriched" {
+  dataset_id          = google_bigquery_dataset.subway.dataset_id
+  table_id            = "vehicle_positions_enriched"
+  deletion_protection = false
+
+  description = "TEST TABLE: Vehicle positions enriched with track data using stateful processing"
+
+  time_partitioning {
+    type  = "DAY"
+    field = "vehicle_timestamp"
+  }
+
+  clustering = ["route_id", "direction", "stop_id"]
+
+  # Same schema as production table
+  schema = jsonencode([
+    {
+      name        = "entity_id"
+      type        = "STRING"
+      mode        = "REQUIRED"
+      description = "Unique entity ID from GTFS-RT feed"
+    },
+    {
+      name        = "trip_id"
+      type        = "STRING"
+      mode        = "REQUIRED"
+      description = "GTFS trip identifier"
+    },
+    {
+      name        = "route_id"
+      type        = "STRING"
+      mode        = "REQUIRED"
+      description = "Route identifier (A, C, E, or H)"
+    },
+    {
+      name        = "start_time"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Scheduled trip start time (HH:MM:SS)"
+    },
+    {
+      name        = "start_date"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Trip start date (YYYYMMDD)"
+    },
+    {
+      name        = "direction"
+      type        = "STRING"
+      mode        = "REQUIRED"
+      description = "Direction (N=Northbound, S=Southbound, U=Unknown)"
+    },
+    {
+      name        = "path_id"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Path identifier extracted from trip_id (e.g., 55R)"
+    },
+    {
+      name        = "train_id"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Physical train identifier from MTA extension"
+    },
+    {
+      name        = "nyct_direction"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Cardinal direction from MTA extension (NORTH, SOUTH, EAST, WEST)"
+    },
+    {
+      name        = "scheduled_track"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Pre-planned track assignment (e.g., F3, A2) - ENRICHED IN PIPELINE"
+    },
+    {
+      name        = "actual_track"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Real-time track assignment from MTA extension (e.g., F3, A2) - ENRICHED IN PIPELINE"
+    },
+    {
+      name        = "stop_id"
+      type        = "STRING"
+      mode        = "REQUIRED"
+      description = "Current station stop ID"
+    },
+    {
+      name        = "current_stop_sequence"
+      type        = "INTEGER"
+      mode        = "NULLABLE"
+      description = "Position of current stop in trip sequence"
+    },
+    {
+      name        = "current_status"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Vehicle status (STOPPED_AT, INCOMING_AT) - only actual arrivals"
+    },
+    {
+      name        = "vehicle_timestamp"
+      type        = "TIMESTAMP"
+      mode        = "REQUIRED"
+      description = "When vehicle reported this position"
+    },
+    {
+      name        = "feed_timestamp"
+      type        = "TIMESTAMP"
+      mode        = "REQUIRED"
+      description = "When MTA generated the feed"
+    },
+    {
+      name        = "ingest_time"
+      type        = "TIMESTAMP"
+      mode        = "REQUIRED"
+      description = "When message was ingested by poller"
+    }
+  ])
+
+  labels = {
+    environment = var.environment
+    data_type   = "vehicle-positions-enriched"
+    purpose     = "testing-stateful-enrichment"
+  }
+}
+
+# Test table for service alerts (parallel to production)
+resource "google_bigquery_table" "service_alerts_test" {
+  dataset_id          = google_bigquery_dataset.subway.dataset_id
+  table_id            = "service_alerts_test"
+  deletion_protection = false
+
+  description = "TEST TABLE: Service alerts for parallel testing"
+
+  time_partitioning {
+    type  = "DAY"
+    field = "feed_timestamp"
+  }
+
+  clustering = ["alert_type"]
+
+  schema = jsonencode([
+    {
+      name        = "alert_id"
+      type        = "STRING"
+      mode        = "REQUIRED"
+      description = "Unique alert identifier"
+    },
+    {
+      name        = "alert_type"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Type of service alert"
+    },
+    {
+      name        = "affected_routes"
+      type        = "STRING"
+      mode        = "REPEATED"
+      description = "Route IDs affected by this alert (A, C, E)"
+    },
+    {
+      name        = "affected_stops"
+      type        = "STRING"
+      mode        = "REPEATED"
+      description = "Stop IDs affected by this alert"
+    },
+    {
+      name        = "active_period_start"
+      type        = "TIMESTAMP"
+      mode        = "NULLABLE"
+      description = "When alert becomes active"
+    },
+    {
+      name        = "active_period_end"
+      type        = "TIMESTAMP"
+      mode        = "NULLABLE"
+      description = "When alert expires"
+    },
+    {
+      name        = "header_text"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Brief alert summary"
+    },
+    {
+      name        = "description_text"
+      type        = "STRING"
+      mode        = "NULLABLE"
+      description = "Detailed alert description"
+    },
+    {
+      name        = "created_at"
+      type        = "TIMESTAMP"
+      mode        = "NULLABLE"
+      description = "When alert was created"
+    },
+    {
+      name        = "updated_at"
+      type        = "TIMESTAMP"
+      mode        = "NULLABLE"
+      description = "When alert was last updated"
+    },
+    {
+      name        = "feed_timestamp"
+      type        = "TIMESTAMP"
+      mode        = "REQUIRED"
+      description = "When MTA generated the feed"
+    },
+    {
+      name        = "ingest_time"
+      type        = "TIMESTAMP"
+      mode        = "REQUIRED"
+      description = "When message was ingested by poller"
+    }
+  ])
+
+  labels = {
+    environment = var.environment
+    data_type   = "service-alerts"
+    purpose     = "testing"
+  }
+}
+
 # Table for service alerts
 resource "google_bigquery_table" "service_alerts" {
   dataset_id          = google_bigquery_dataset.subway.dataset_id

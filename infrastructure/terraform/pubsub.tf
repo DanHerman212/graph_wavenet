@@ -141,5 +141,69 @@ resource "google_pubsub_subscription" "dead_letter" {
   }
 }
 
+# =============================================================================
+# TEST SUBSCRIPTIONS - For testing stateful enrichment pipeline in parallel
+# =============================================================================
+
+# Test subscription for GTFS-RT ACE messages
+resource "google_pubsub_subscription" "gtfs_rt_test" {
+  name  = "gtfs-rt-ace-dataflow-test"
+  topic = google_pubsub_topic.gtfs_rt.id
+
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+  ack_deadline_seconds       = 60
+
+  expiration_policy {
+    ttl = ""
+  }
+
+  labels = {
+    environment = var.environment
+    consumer    = "dataflow-test"
+    purpose     = "testing-stateful-enrichment"
+  }
+}
+
+# Test subscription for GTFS-RT BDFM messages
+resource "google_pubsub_subscription" "gtfs_rt_bdfm_test" {
+  name  = "gtfs-rt-bdfm-dataflow-test"
+  topic = google_pubsub_topic.gtfs_rt_bdfm.id
+
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+  ack_deadline_seconds       = 60
+
+  expiration_policy {
+    ttl = ""
+  }
+
+  labels = {
+    environment = var.environment
+    consumer    = "dataflow-test"
+    purpose     = "testing-stateful-enrichment"
+  }
+}
+
+# Test subscription for Service Alerts
+resource "google_pubsub_subscription" "service_alerts_test" {
+  name  = "service-alerts-dataflow-test"
+  topic = google_pubsub_topic.service_alerts.id
+
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+  ack_deadline_seconds       = 60
+
+  expiration_policy {
+    ttl = ""
+  }
+
+  labels = {
+    environment = var.environment
+    consumer    = "dataflow-test"
+    purpose     = "testing-stateful-enrichment"
+  }
+}
+
 # Get current project for service account reference
 data "google_project" "current" {}
