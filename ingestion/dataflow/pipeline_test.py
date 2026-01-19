@@ -27,19 +27,19 @@ Usage:
         --streaming
 """
 
+from __future__ import absolute_import
+from __future__ import print_function
+
 import argparse
+import json
 import logging
-from typing import Any, Dict, Iterator, Tuple
 from datetime import timedelta
 
 import apache_beam as beam
 from apache_beam import coders
-from apache_beam.transforms.userstate import ReadModifyWriteStateSpec, TimerSpec
-from apache_beam.transforms import trigger
-from apache_beam.transforms.window import TimestampedValue, FixedWindows
+from apache_beam.transforms.userstate import ReadModifyWriteStateSpec
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions
 from apache_beam.io.gcp.bigquery import BigQueryDisposition, WriteToBigQuery
-from apache_beam.utils.timestamp import Duration
 
 from transforms.parse_gtfs import ExtractVehiclePositions, ValidateVehiclePosition
 from transforms.parse_alerts import ExtractAlerts, ValidateAlert
@@ -83,15 +83,13 @@ class SubwayPipelineOptions(PipelineOptions):
 class TrackDataCoder(coders.Coder):
     """Custom coder for track data state storage."""
     
-    def encode(self, value: Dict[str, Any]) -> bytes:
-        import json
+    def encode(self, value):
         return json.dumps(value).encode('utf-8')
     
-    def decode(self, encoded: bytes) -> Dict[str, Any]:
-        import json
+    def decode(self, encoded):
         return json.loads(encoded.decode('utf-8'))
     
-    def is_deterministic(self) -> bool:
+    def is_deterministic(self):
         return True
 
 
@@ -100,15 +98,10 @@ class EnrichWithTrackData(beam.DoFn):
     
     Maintains a state store of track assignments from trip_updates.
     When vehicle positions arrive, looks up cached track data and merges it.
-    
-    State expires after 30 minutes to prevent unbounded growth.
     """
     
     # State spec: stores track data keyed by (trip_id, stop_id)
     TRACK_STATE = ReadModifyWriteStateSpec('track_cache', TrackDataCoder())
-    
-    # Timer spec: for state cleanup
-    EXPIRY_TIMER = TimerSpec('expiry', trigger.TimeDomain.REAL_TIME)
     
     def __init__(self):
         self.enriched_count = beam.metrics.Metrics.counter(self.__class__, "enriched_records")
@@ -118,53 +111,51 @@ class EnrichWithTrackData(beam.DoFn):
     
     def process(
         self,
-        element: Dict[str, Any],
-        track_state=beam.DoFn.StateParam(TRACK_STATE),
-        expiry_timer=beam.DoFn.TimerParam(EXPIRY_TIMER)
-    ) -> Iterator[Dict[str, Any]]:
+        element,
+        track_state=beam.DoFn.StateParam(TRACK_STATE)
+    ):
         """Process vehicle position or trip update and enrich with track data.
         
         Args:
-            element: Vehicle position or trip update record
+            element: Tuple of (key, record) where key is "trip_id|stop_id"
             track_state: State storage for track assignments
-            expiry_timer: Timer for state expiration
             
         Yields:
             Enriched vehicle position records (only for actual arrivals)
         """
-        trip_id = element.get("trip_id")
-        stop_id = element.get("stop_id")
-        current_status = element.get("current_status")
+        # Unpack the keyed element
+        key, record = element
+        
+        trip_id = record.get("trip_id")
+        stop_id = record.get("stop_id")
+        current_status = record.get("current_status")
         
         if not trip_id or not stop_id:
             return
         
         # Create state key
-        state_key = f"{trip_id}|{stop_id}"
+        state_key = "{0}|{1}".format(trip_id, stop_id)
         
         # Case 1: Trip update with track data - store in state
         if current_status == "IN_TRANSIT_TO":
-            scheduled_track = element.get("scheduled_track")
-            actual_track = element.get("actual_track")
+            scheduled_track = record.get("scheduled_track")
+            actual_track = record.get("actual_track")
             
             # Only cache if we have track data
             if scheduled_track or actual_track:
                 track_data = {
                     "scheduled_track": scheduled_track,
                     "actual_track": actual_track,
-                    "train_id": element.get("train_id"),
-                    "nyct_direction": element.get("nyct_direction"),
-                    "cached_at": element.get("vehicle_timestamp"),
+                    "train_id": record.get("train_id"),
+                    "nyct_direction": record.get("nyct_direction"),
+                    "cached_at": record.get("vehicle_timestamp"),
                 }
                 
                 # Store in state
                 track_state.write(track_data)
                 self.track_cached.inc()
                 
-                # Set expiry timer for 30 minutes from now
-                expiry_timer.set(Duration.of(1800))  # 30 minutes in seconds
-                
-                logger.debug(f"Cached track data for {state_key}: {actual_track}")
+                logger.debug("Cached track data for {0}: {1}".format(state_key, actual_track))
             
             # Don't yield trip updates - only actual arrivals
             return
@@ -179,38 +170,33 @@ class EnrichWithTrackData(beam.DoFn):
                 from datetime import datetime
                 try:
                     cached_time = datetime.fromisoformat(cached_track_data["cached_at"].replace("Z", "+00:00"))
-                    arrival_time = datetime.fromisoformat(element["vehicle_timestamp"].replace("Z", "+00:00"))
+                    arrival_time = datetime.fromisoformat(record["vehicle_timestamp"].replace("Z", "+00:00"))
                     age_minutes = (arrival_time - cached_time).total_seconds() / 60
                     
                     if age_minutes > 15:
                         self.stale_data.inc()
-                        logger.warning(f"Stale track data for {state_key}: {age_minutes:.1f} min old")
+                        logger.warning("Stale track data for {0}: {1:.1f} min old".format(state_key, age_minutes))
                     else:
                         # Merge cached track data into the record
-                        element["scheduled_track"] = cached_track_data.get("scheduled_track")
-                        element["actual_track"] = cached_track_data.get("actual_track")
+                        record["scheduled_track"] = cached_track_data.get("scheduled_track")
+                        record["actual_track"] = cached_track_data.get("actual_track")
                         
                         # Also enrich with train_id and direction if missing
-                        if not element.get("train_id"):
-                            element["train_id"] = cached_track_data.get("train_id")
-                        if not element.get("nyct_direction"):
-                            element["nyct_direction"] = cached_track_data.get("nyct_direction")
+                        if not record.get("train_id"):
+                            record["train_id"] = cached_track_data.get("train_id")
+                        if not record.get("nyct_direction"):
+                            record["nyct_direction"] = cached_track_data.get("nyct_direction")
                         
                         self.enriched_count.inc()
-                        logger.debug(f"Enriched arrival at {stop_id} with track: {element['actual_track']}")
+                        logger.debug("Enriched arrival at {0} with track: {1}".format(stop_id, record['actual_track']))
                 except Exception as e:
-                    logger.error(f"Error checking data age: {e}")
+                    logger.error("Error checking data age: {0}".format(e))
             else:
                 self.no_track_data.inc()
-                logger.debug(f"No cached track data for {state_key}")
+                logger.debug("No cached track data for {0}".format(state_key))
             
             # Yield the (possibly enriched) arrival record
-            yield element
-    
-    @beam.DoFn.on_timer(EXPIRY_TIMER)
-    def on_expiry(self, track_state=beam.DoFn.StateParam(TRACK_STATE)):
-        """Clean up expired state."""
-        track_state.clear()
+            yield record
 
 
 def run(argv=None):
@@ -229,11 +215,11 @@ def run(argv=None):
     logger.info("=" * 80)
     logger.info("Starting TEST NYC Subway GTFS-RT streaming pipeline with stateful enrichment")
     logger.info("=" * 80)
-    logger.info(f"GTFS ACE subscription: {subway_options.gtfs_ace_subscription}")
-    logger.info(f"GTFS BDFM subscription: {subway_options.gtfs_bdfm_subscription}")
-    logger.info(f"Alerts subscription: {subway_options.alerts_subscription}")
-    logger.info(f"Output table: {subway_options.output_table}")
-    logger.info(f"Alerts table: {subway_options.alerts_table}")
+    logger.info("GTFS ACE subscription: {0}".format(subway_options.gtfs_ace_subscription))
+    logger.info("GTFS BDFM subscription: {0}".format(subway_options.gtfs_bdfm_subscription))
+    logger.info("Alerts subscription: {0}".format(subway_options.alerts_subscription))
+    logger.info("Output table: {0}".format(subway_options.output_table))
+    logger.info("Alerts table: {0}".format(subway_options.alerts_table))
     logger.info("=" * 80)
     
     # Build and run the pipeline
@@ -271,7 +257,7 @@ def run(argv=None):
         keyed_records = (
             all_records
             | "KeyByTripStop" >> beam.Map(
-                lambda x: (f"{x['trip_id']}|{x['stop_id']}", x)
+                lambda x: ("{0}|{1}".format(x['trip_id'], x['stop_id']), x)
             )
         )
         

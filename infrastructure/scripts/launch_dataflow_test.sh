@@ -46,18 +46,19 @@ echo ""
 cd ingestion/dataflow
 
 # Install dependencies if needed
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
 # Launch the TEST pipeline
 echo "Launching TEST pipeline with stateful enrichment..."
-python pipeline_test.py \
+python3 pipeline_test.py \
     --runner=DataflowRunner \
     --project="${PROJECT_ID}" \
     --region="${REGION}" \
-    --job_name="subway-gtfs-pipeline-TEST-$(date +%Y%m%d-%H%M%S)" \
+    --job_name="subway-gtfs-pipeline-test-$(date +%Y%m%d-%H%M%S)" \
     --temp_location="gs://${TEMP_BUCKET}/temp-test" \
     --staging_location="gs://${STAGING_BUCKET}/staging-test" \
     --service_account_email="${SERVICE_ACCOUNT}" \
+    --setup_file="./setup.py" \
     --max_num_workers=2 \
     --machine_type=n1-standard-1 \
     --gtfs_ace_subscription="${GTFS_ACE_SUB_TEST}" \
