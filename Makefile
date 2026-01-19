@@ -66,9 +66,9 @@ deploy-ingestion:
 		sudo cp -r ~/poller-staging/* /opt/gtfs-poller/ && \
 		rm -rf ~/poller-staging && \
 		cd /opt/gtfs-poller && \
-		[ -d venv ] || sudo python3 -m venv venv && \
+		if [ ! -f venv/bin/activate ]; then sudo python3 -m venv venv; fi && \
 		sudo chown -R \$$(id -u):\$$(id -g) venv && \
-		source venv/bin/activate && \
+		. venv/bin/activate && \
 		pip install -q -r requirements.txt && \
 		sudo systemctl restart gtfs-poller && \
 		sudo systemctl status gtfs-poller --no-pager"
@@ -109,7 +109,8 @@ deploy-dataflow:
 		--setup_file=./setup.py \
 		--machine_type=e2-medium \
 		--max_num_workers=2 \
-		--gtfs_subscription=projects/$(PROJECT_ID)/subscriptions/gtfs-rt-ace-dataflow \
+		--gtfs_ace_subscription=projects/$(PROJECT_ID)/subscriptions/gtfs-rt-ace-dataflow \
+		--gtfs_bdfm_subscription=projects/$(PROJECT_ID)/subscriptions/gtfs-rt-bdfm-dataflow \
 		--alerts_subscription=projects/$(PROJECT_ID)/subscriptions/service-alerts-dataflow \
 		--output_table=$(PROJECT_ID):subway.vehicle_positions \
 		--alerts_table=$(PROJECT_ID):subway.service_alerts

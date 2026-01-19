@@ -3,6 +3,8 @@ GTFS-RT Poller for NYC Subway
 
 Fetches GTFS-RT protobuf data from MTA, converts to JSON,
 and publishes to Pub/Sub.
+
+Supports multiple feeds (ACE, BDFM, etc.) via feed_url and feed_id parameters.
 """
 
 import json
@@ -22,12 +24,27 @@ logger = logging.getLogger(__name__)
 
 
 class GTFSPoller:
-    """Fetches GTFS-RT feed, converts to JSON, and publishes to Pub/Sub."""
+    """Fetches GTFS-RT feed, converts to JSON, and publishes to Pub/Sub.
+    
+    Args:
+        feed_url: URL to fetch GTFS-RT protobuf from
+        topic_path: Full Pub/Sub topic path to publish to
+        feed_id: Identifier for this feed (e.g., 'ace', 'bdfm')
+        config: Optional Config instance (uses global config if not provided)
+    """
 
-    def __init__(self, config: Optional[Config] = None):
+    def __init__(
+        self,
+        feed_url: str,
+        topic_path: str,
+        feed_id: str,
+        config: Optional[Config] = None,
+    ):
         self.config = config or get_config()
+        self.feed_url = feed_url
+        self.topic_path = topic_path
+        self.feed_id = feed_id
         self.publisher = pubsub_v1.PublisherClient()
-        self.topic_path = self.config.gtfs_topic
         self._session = requests.Session()
 
     def fetch_feed(self) -> Optional[bytes]:
@@ -35,13 +52,13 @@ class GTFSPoller:
         for attempt in range(self.config.max_retries):
             try:
                 response = self._session.get(
-                    self.config.gtfs_ace_url,
+                    self.feed_url,
                     timeout=self.config.request_timeout_seconds,
                 )
                 response.raise_for_status()
                 return response.content
             except requests.exceptions.RequestException as e:
-                logger.warning(f"Fetch failed (attempt {attempt + 1}): {e}")
+                logger.warning(f"[{self.feed_id}] Fetch failed (attempt {attempt + 1}): {e}")
                 if attempt < self.config.max_retries - 1:
                     time.sleep(self.config.retry_backoff_seconds * (2 ** attempt))
         return None
@@ -65,12 +82,12 @@ class GTFSPoller:
                 self.topic_path,
                 json_data.encode("utf-8"),
                 feed_type="gtfs-rt",
-                feed_id="ace",
+                feed_id=self.feed_id,
             )
             future.result(timeout=30)
             return True
         except Exception as e:
-            logger.error(f"Failed to publish: {e}")
+            logger.error(f"[{self.feed_id}] Failed to publish: {e}")
             return False
 
     def poll_once(self) -> dict:

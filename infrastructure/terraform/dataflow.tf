@@ -23,9 +23,16 @@ resource "google_storage_bucket_object" "pipeline_metadata" {
     description = "Streaming pipeline for NYC Subway GTFS-RT data ingestion"
     parameters = [
       {
-        name        = "gtfs_subscription"
-        label       = "GTFS-RT Pub/Sub Subscription"
-        helpText    = "Pub/Sub subscription for GTFS-RT messages"
+        name        = "gtfs_ace_subscription"
+        label       = "GTFS-RT ACE Pub/Sub Subscription"
+        helpText    = "Pub/Sub subscription for GTFS-RT ACE messages"
+        isOptional  = false
+        regexes     = ["projects/[^/]+/subscriptions/[^/]+"]
+      },
+      {
+        name        = "gtfs_bdfm_subscription"
+        label       = "GTFS-RT BDFM Pub/Sub Subscription"
+        helpText    = "Pub/Sub subscription for GTFS-RT BDFM messages"
         isOptional  = false
         regexes     = ["projects/[^/]+/subscriptions/[^/]+"]
       },
@@ -37,9 +44,9 @@ resource "google_storage_bucket_object" "pipeline_metadata" {
         regexes     = ["projects/[^/]+/subscriptions/[^/]+"]
       },
       {
-        name        = "sensor_table"
-        label       = "BigQuery Sensor Data Table"
-        helpText    = "BigQuery table for sensor data (project:dataset.table)"
+        name        = "output_table"
+        label       = "BigQuery Vehicle Positions Table"
+        helpText    = "BigQuery table for vehicle positions (project:dataset.table)"
         isOptional  = false
       },
       {
@@ -67,7 +74,8 @@ output "dataflow_launch_command" {
       --service_account_email=${google_service_account.dataflow.email} \
       --max_num_workers=${var.dataflow_max_workers} \
       --machine_type=${var.dataflow_machine_type} \
-      --gtfs_subscription=projects/${var.project_id}/subscriptions/${google_pubsub_subscription.gtfs_rt.name} \
+      --gtfs_ace_subscription=projects/${var.project_id}/subscriptions/${google_pubsub_subscription.gtfs_rt.name} \
+      --gtfs_bdfm_subscription=projects/${var.project_id}/subscriptions/${google_pubsub_subscription.gtfs_rt_bdfm.name} \
       --alerts_subscription=projects/${var.project_id}/subscriptions/${google_pubsub_subscription.service_alerts.name} \
       --output_table=${var.project_id}:${google_bigquery_dataset.subway.dataset_id}.${google_bigquery_table.vehicle_positions.table_id} \
       --alerts_table=${var.project_id}:${google_bigquery_dataset.subway.dataset_id}.${google_bigquery_table.service_alerts.table_id} \

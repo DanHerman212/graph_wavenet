@@ -14,18 +14,20 @@ echo "Region: ${REGION}"
 echo ""
 
 # Get resource names from Terraform outputs
-GTFS_SUB=$(terraform -chdir=infrastructure/terraform output -raw gtfs_subscription_name)
+GTFS_ACE_SUB=$(terraform -chdir=infrastructure/terraform output -raw gtfs_ace_subscription_name)
+GTFS_BDFM_SUB=$(terraform -chdir=infrastructure/terraform output -raw gtfs_bdfm_subscription_name)
 ALERTS_SUB=$(terraform -chdir=infrastructure/terraform output -raw alerts_subscription_name)
 STAGING_BUCKET=$(terraform -chdir=infrastructure/terraform output -raw dataflow_staging_bucket)
 TEMP_BUCKET=$(terraform -chdir=infrastructure/terraform output -raw dataflow_temp_bucket)
 SERVICE_ACCOUNT=$(terraform -chdir=infrastructure/terraform output -raw dataflow_service_account)
 
 # BigQuery tables
-SENSOR_TABLE="${PROJECT_ID}:subway.sensor_data"
+VEHICLE_TABLE="${PROJECT_ID}:subway.vehicle_positions"
 ALERTS_TABLE="${PROJECT_ID}:subway.service_alerts"
 
 echo "Subscriptions:"
-echo "  GTFS: ${GTFS_SUB}"
+echo "  GTFS ACE: ${GTFS_ACE_SUB}"
+echo "  GTFS BDFM: ${GTFS_BDFM_SUB}"
 echo "  Alerts: ${ALERTS_SUB}"
 echo ""
 
@@ -47,9 +49,10 @@ python pipeline.py \
     --service_account_email="${SERVICE_ACCOUNT}" \
     --max_num_workers=2 \
     --machine_type=n1-standard-1 \
-    --gtfs_subscription="projects/${PROJECT_ID}/subscriptions/${GTFS_SUB}" \
+    --gtfs_ace_subscription="projects/${PROJECT_ID}/subscriptions/${GTFS_ACE_SUB}" \
+    --gtfs_bdfm_subscription="projects/${PROJECT_ID}/subscriptions/${GTFS_BDFM_SUB}" \
     --alerts_subscription="projects/${PROJECT_ID}/subscriptions/${ALERTS_SUB}" \
-    --sensor_table="${SENSOR_TABLE}" \
+    --output_table="${VEHICLE_TABLE}" \
     --alerts_table="${ALERTS_TABLE}" \
     --streaming
 

@@ -9,7 +9,7 @@ resource "google_pubsub_topic" "dead_letter" {
   depends_on = [google_project_service.apis]
 }
 
-# GTFS-RT Topic for vehicle positions and trip updates
+# GTFS-RT Topic for ACE vehicle positions and trip updates
 resource "google_pubsub_topic" "gtfs_rt" {
   name = "gtfs-rt-ace"
 
@@ -19,6 +19,21 @@ resource "google_pubsub_topic" "gtfs_rt" {
     environment = var.environment
     feed_type   = "gtfs-rt"
     routes      = "ace"
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+# GTFS-RT Topic for BDFM vehicle positions and trip updates
+resource "google_pubsub_topic" "gtfs_rt_bdfm" {
+  name = "gtfs-rt-bdfm"
+
+  message_retention_duration = "86400s" # 24 hours
+
+  labels = {
+    environment = var.environment
+    feed_type   = "gtfs-rt"
+    routes      = "bdfm"
   }
 
   depends_on = [google_project_service.apis]
@@ -38,11 +53,34 @@ resource "google_pubsub_topic" "service_alerts" {
   depends_on = [google_project_service.apis]
 }
 
-# Subscription for GTFS-RT messages (consumed by Dataflow)
+# Subscription for GTFS-RT ACE messages (consumed by Dataflow)
 # Note: Dataflow handles its own deduplication and retry logic
 resource "google_pubsub_subscription" "gtfs_rt" {
   name  = "gtfs-rt-ace-dataflow"
   topic = google_pubsub_topic.gtfs_rt.id
+
+  # 7 days retention
+  message_retention_duration = "604800s"
+  retain_acked_messages      = false
+
+  # Acknowledgement deadline
+  ack_deadline_seconds = 60
+
+  # Expiration policy (never expire)
+  expiration_policy {
+    ttl = ""
+  }
+
+  labels = {
+    environment = var.environment
+    consumer    = "dataflow"
+  }
+}
+
+# Subscription for GTFS-RT BDFM messages (consumed by Dataflow)
+resource "google_pubsub_subscription" "gtfs_rt_bdfm" {
+  name  = "gtfs-rt-bdfm-dataflow"
+  topic = google_pubsub_topic.gtfs_rt_bdfm.id
 
   # 7 days retention
   message_retention_duration = "604800s"

@@ -18,11 +18,13 @@ class Config:
     
     # GCP Configuration
     project_id: str
-    gtfs_topic: str
+    gtfs_ace_topic: str
+    gtfs_bdfm_topic: str
     alerts_topic: str
     
     # MTA Feed URLs (public, no API key required)
     gtfs_ace_url: str = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace"
+    gtfs_bdfm_url: str = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm"
     alerts_url: str = "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts.json"
     
     # Polling Configuration
@@ -39,9 +41,13 @@ class Config:
             raise ValueError("GOOGLE_CLOUD_PROJECT environment variable is required")
         
         # Build full topic paths
-        gtfs_topic = os.environ.get(
-            "GTFS_TOPIC",
+        gtfs_ace_topic = os.environ.get(
+            "GTFS_ACE_TOPIC",
             f"projects/{project_id}/topics/gtfs-rt-ace"
+        )
+        gtfs_bdfm_topic = os.environ.get(
+            "GTFS_BDFM_TOPIC",
+            f"projects/{project_id}/topics/gtfs-rt-bdfm"
         )
         alerts_topic = os.environ.get(
             "ALERTS_TOPIC",
@@ -50,7 +56,8 @@ class Config:
         
         return cls(
             project_id=project_id,
-            gtfs_topic=gtfs_topic,
+            gtfs_ace_topic=gtfs_ace_topic,
+            gtfs_bdfm_topic=gtfs_bdfm_topic,
             alerts_topic=alerts_topic,
             poll_interval_seconds=int(os.environ.get("POLL_INTERVAL", "30")),
             request_timeout_seconds=int(os.environ.get("REQUEST_TIMEOUT", "10")),

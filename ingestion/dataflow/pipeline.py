@@ -15,7 +15,8 @@ Usage:
         --region=us-east1 \
         --temp_location=gs://YOUR_BUCKET/temp \
         --staging_location=gs://YOUR_BUCKET/staging \
-        --gtfs_subscription=projects/PROJECT/subscriptions/gtfs-rt-ace-dataflow \
+        --gtfs_ace_subscription=projects/PROJECT/subscriptions/gtfs-rt-ace-dataflow \
+        --gtfs_bdfm_subscription=projects/PROJECT/subscriptions/gtfs-rt-bdfm-dataflow \
         --alerts_subscription=projects/PROJECT/subscriptions/service-alerts-dataflow \
         --output_table=PROJECT:subway.vehicle_positions \
         --alerts_table=PROJECT:subway.service_alerts \
@@ -42,9 +43,14 @@ class SubwayPipelineOptions(PipelineOptions):
     @classmethod
     def _add_argparse_args(cls, parser):
         parser.add_argument(
-            "--gtfs_subscription",
+            "--gtfs_ace_subscription",
             required=True,
-            help="Pub/Sub subscription for GTFS-RT messages"
+            help="Pub/Sub subscription for GTFS-RT ACE messages"
+        )
+        parser.add_argument(
+            "--gtfs_bdfm_subscription",
+            required=True,
+            help="Pub/Sub subscription for GTFS-RT BDFM messages"
         )
         parser.add_argument(
             "--alerts_subscription",
@@ -77,7 +83,8 @@ def run(argv=None):
     pipeline_options.view_as(StandardOptions).streaming = True
     
     logger.info("Starting NYC Subway GTFS-RT streaming pipeline")
-    logger.info(f"GTFS subscription: {subway_options.gtfs_subscription}")
+    logger.info(f"GTFS ACE subscription: {subway_options.gtfs_ace_subscription}")
+    logger.info(f"GTFS BDFM subscription: {subway_options.gtfs_bdfm_subscription}")
     logger.info(f"Alerts subscription: {subway_options.alerts_subscription}")
     logger.info(f"Output table: {subway_options.output_table}")
     logger.info(f"Alerts table: {subway_options.alerts_table}")
@@ -86,17 +93,30 @@ def run(argv=None):
     with beam.Pipeline(options=pipeline_options) as p:
         
         # =====================================================================
-        # Vehicle Positions Branch
+        # Vehicle Positions Branch (ACE + BDFM merged)
         # =====================================================================
-        vehicle_positions = (
+        
+        # Read ACE feed
+        gtfs_ace = (
             p
-            # Read GTFS-RT messages from Pub/Sub
-            | "ReadGTFS" >> beam.io.ReadFromPubSub(
-                subscription=subway_options.gtfs_subscription
+            | "ReadGTFS_ACE" >> beam.io.ReadFromPubSub(
+                subscription=subway_options.gtfs_ace_subscription
             )
-            # Extract individual vehicle position records from each message
+        )
+        
+        # Read BDFM feed
+        gtfs_bdfm = (
+            p
+            | "ReadGTFS_BDFM" >> beam.io.ReadFromPubSub(
+                subscription=subway_options.gtfs_bdfm_subscription
+            )
+        )
+        
+        # Merge both feeds and extract vehicle positions
+        vehicle_positions = (
+            (gtfs_ace, gtfs_bdfm)
+            | "MergeGTFSFeeds" >> beam.Flatten()
             | "ExtractVehicles" >> beam.ParDo(ExtractVehiclePositions())
-            # Validate required fields
             | "ValidateVehicles" >> beam.ParDo(ValidateVehiclePosition())
         )
         

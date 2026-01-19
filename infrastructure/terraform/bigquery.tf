@@ -4,7 +4,7 @@
 resource "google_bigquery_dataset" "subway" {
   dataset_id    = var.bigquery_dataset_id
   friendly_name = "NYC Subway Data"
-  description   = "Data warehouse for NYC Subway A/C/E line vehicle positions and service alerts"
+  description   = "Data warehouse for NYC Subway ACE and BDFM line vehicle positions and service alerts"
   location      = var.region
 
   default_table_expiration_ms = var.retention_days * 24 * 60 * 60 * 1000
@@ -45,7 +45,7 @@ resource "google_bigquery_table" "vehicle_positions" {
   table_id            = "vehicle_positions"
   deletion_protection = false
 
-  description = "Real-time vehicle positions for A/C/E subway lines"
+  description = "Real-time vehicle positions for ACE and BDFM subway lines"
 
   time_partitioning {
     type  = "DAY"
@@ -147,7 +147,7 @@ resource "google_bigquery_table" "service_alerts" {
   table_id            = "service_alerts"
   deletion_protection = false
 
-  description = "Service alerts for A/C/E subway lines (delays, planned work, incidents)"
+  description = "Service alerts for ACE and BDFM subway lines (delays, planned work, incidents)"
 
   time_partitioning {
     type  = "DAY"
@@ -173,7 +173,7 @@ resource "google_bigquery_table" "service_alerts" {
       name        = "affected_routes"
       type        = "STRING"
       mode        = "REPEATED"
-      description = "Routes affected by this alert (A, C, E only)"
+      description = "Routes affected by this alert (ACE and BDFM lines)"
     },
     {
       name        = "affected_stops"

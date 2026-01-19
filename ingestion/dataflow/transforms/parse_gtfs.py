@@ -186,8 +186,9 @@ class ValidateVehiclePosition(beam.DoFn):
                 logger.warning(f"Missing required field: {field}")
                 return
         
-        # Validate route_id is A/C/E/H (Rockaway shuttle)
-        if element["route_id"] not in ("A", "C", "E", "H"):
+        # Validate route_id is from ACE or BDFM feeds
+        valid_routes = ("A", "B", "C", "D", "E", "F", "H", "M", "S")
+        if element["route_id"] not in valid_routes:
             self.invalid_records.inc()
             logger.warning(f"Invalid route_id: {element['route_id']}")
             return

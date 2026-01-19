@@ -15,8 +15,8 @@ from apache_beam.metrics import Metrics
 
 logger = logging.getLogger(__name__)
 
-# Routes we care about
-TARGET_ROUTES = {"A", "C", "E"}
+# Routes we care about (ACE and BDFM lines)
+TARGET_ROUTES = {"A", "B", "C", "D", "E", "F", "M", "S"}
 
 
 def unix_to_iso(timestamp) -> Optional[str]:

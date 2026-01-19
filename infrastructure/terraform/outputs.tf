@@ -11,14 +11,24 @@ output "region" {
 }
 
 # Pub/Sub outputs
-output "gtfs_topic_name" {
-  description = "Name of the GTFS-RT Pub/Sub topic"
+output "gtfs_ace_topic_name" {
+  description = "Name of the GTFS-RT ACE Pub/Sub topic"
   value       = google_pubsub_topic.gtfs_rt.name
 }
 
-output "gtfs_topic_id" {
-  description = "Full ID of the GTFS-RT Pub/Sub topic"
+output "gtfs_ace_topic_id" {
+  description = "Full ID of the GTFS-RT ACE Pub/Sub topic"
   value       = google_pubsub_topic.gtfs_rt.id
+}
+
+output "gtfs_bdfm_topic_name" {
+  description = "Name of the GTFS-RT BDFM Pub/Sub topic"
+  value       = google_pubsub_topic.gtfs_rt_bdfm.name
+}
+
+output "gtfs_bdfm_topic_id" {
+  description = "Full ID of the GTFS-RT BDFM Pub/Sub topic"
+  value       = google_pubsub_topic.gtfs_rt_bdfm.id
 }
 
 output "alerts_topic_name" {
@@ -31,9 +41,14 @@ output "alerts_topic_id" {
   value       = google_pubsub_topic.service_alerts.id
 }
 
-output "gtfs_subscription_name" {
-  description = "Name of the GTFS-RT Pub/Sub subscription"
+output "gtfs_ace_subscription_name" {
+  description = "Name of the GTFS-RT ACE Pub/Sub subscription"
   value       = google_pubsub_subscription.gtfs_rt.name
+}
+
+output "gtfs_bdfm_subscription_name" {
+  description = "Name of the GTFS-RT BDFM Pub/Sub subscription"
+  value       = google_pubsub_subscription.gtfs_rt_bdfm.name
 }
 
 output "alerts_subscription_name" {
@@ -99,7 +114,8 @@ output "dataflow_temp_bucket" {
 output "connection_config" {
   description = "Configuration values for the poller application"
   value = {
-    gtfs_topic      = google_pubsub_topic.gtfs_rt.id
+    gtfs_ace_topic  = google_pubsub_topic.gtfs_rt.id
+    gtfs_bdfm_topic = google_pubsub_topic.gtfs_rt_bdfm.id
     alerts_topic    = google_pubsub_topic.service_alerts.id
     project_id      = var.project_id
     vehicle_positions_table = "${var.project_id}:${google_bigquery_dataset.subway.dataset_id}.${google_bigquery_table.vehicle_positions.table_id}"

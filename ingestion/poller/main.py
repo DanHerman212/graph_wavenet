@@ -80,19 +80,36 @@ def main():
     logger.info("NYC Subway Feed Poller")
     logger.info("=" * 50)
     logger.info(f"Project: {config.project_id}")
-    logger.info(f"GTFS Topic: {config.gtfs_topic}")
+    logger.info(f"GTFS ACE Topic: {config.gtfs_ace_topic}")
+    logger.info(f"GTFS BDFM Topic: {config.gtfs_bdfm_topic}")
     logger.info(f"Alerts Topic: {config.alerts_topic}")
     logger.info(f"Poll Interval: {config.poll_interval_seconds}s")
     logger.info("=" * 50)
     
     # Create pollers
-    gtfs_poller = GTFSPoller(config)
+    gtfs_ace_poller = GTFSPoller(
+        feed_url=config.gtfs_ace_url,
+        topic_path=config.gtfs_ace_topic,
+        feed_id="ace",
+        config=config,
+    )
+    gtfs_bdfm_poller = GTFSPoller(
+        feed_url=config.gtfs_bdfm_url,
+        topic_path=config.gtfs_bdfm_topic,
+        feed_id="bdfm",
+        config=config,
+    )
     alerts_poller = AlertsPoller(config)
     
     # Start poller threads
-    gtfs_thread = threading.Thread(
+    gtfs_ace_thread = threading.Thread(
         target=run_poller,
-        args=(gtfs_poller, "GTFS", shutdown),
+        args=(gtfs_ace_poller, "GTFS-ACE", shutdown),
+        daemon=True,
+    )
+    gtfs_bdfm_thread = threading.Thread(
+        target=run_poller,
+        args=(gtfs_bdfm_poller, "GTFS-BDFM", shutdown),
         daemon=True,
     )
     alerts_thread = threading.Thread(
@@ -101,7 +118,8 @@ def main():
         daemon=True,
     )
     
-    gtfs_thread.start()
+    gtfs_ace_thread.start()
+    gtfs_bdfm_thread.start()
     alerts_thread.start()
     
     # Wait for shutdown
@@ -112,7 +130,8 @@ def main():
         pass
     
     logger.info("Waiting for threads to finish...")
-    gtfs_thread.join(timeout=5)
+    gtfs_ace_thread.join(timeout=5)
+    gtfs_bdfm_thread.join(timeout=5)
     alerts_thread.join(timeout=5)
     logger.info("Shutdown complete")
 

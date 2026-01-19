@@ -28,7 +28,7 @@ locals {
     # Create systemd service
     cat > /etc/systemd/system/gtfs-poller.service << 'SYSTEMD'
     [Unit]
-    Description=GTFS-RT Poller for NYC Subway A/C/E
+    Description=GTFS-RT Poller for NYC Subway ACE and BDFM
     After=network.target
     
     [Service]
@@ -36,7 +36,8 @@ locals {
     User=root
     WorkingDirectory=/opt/gtfs-poller
     Environment=GOOGLE_CLOUD_PROJECT=${var.project_id}
-    Environment=GTFS_TOPIC=${google_pubsub_topic.gtfs_rt.id}
+    Environment=GTFS_ACE_TOPIC=${google_pubsub_topic.gtfs_rt.id}
+    Environment=GTFS_BDFM_TOPIC=${google_pubsub_topic.gtfs_rt_bdfm.id}
     Environment=ALERTS_TOPIC=${google_pubsub_topic.service_alerts.id}
     ExecStart=/opt/gtfs-poller/venv/bin/python /opt/gtfs-poller/main.py
     Restart=always
