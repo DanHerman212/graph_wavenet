@@ -1,6 +1,15 @@
 # Ingestion Pipeline Operations Guide
 
-This guide covers the deployment and operation of the NYC Subway data ingestion pipeline.
+This guide covers the deployment and operation of the NYC Subway data ingestion pipeline with stateful track enrichment.
+
+## Overview
+
+The pipeline consists of:
+1. **Pollers** (GCE VM) - Fetch GTFS-RT feeds every 30 seconds → Pub/Sub
+2. **Dataflow** (Streaming) - Parse messages, enrich arrivals with track data, write to BigQuery
+3. **BigQuery** - Data warehouse with arrival records enriched with track assignments
+
+**Key Feature:** Track data from trip_updates is cached in-memory and merged into arrival records during streaming, achieving 99% track coverage without SQL joins.
 
 ## Prerequisites
 
