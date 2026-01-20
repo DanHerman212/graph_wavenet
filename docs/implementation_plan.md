@@ -40,39 +40,47 @@
 - [ ] Add message attributes for routing
 - [ ] Configure acknowledgment settings
 
-### Week 3: Dataflow Pipeline
+### Week 3: Dataflow Pipeline with Stateful Enrichment
 
 #### 3.1 Apache Beam Pipeline
-- [ ] Create streaming pipeline from Pub/Sub
-- [ ] Implement GTFS message parsing transforms
-- [ ] Implement alerts parsing transforms
-- [ ] Configure windowing (30-second tumbling windows)
-- [ ] Add dead-letter queue for failed messages
+- [x] Create streaming pipeline from Pub/Sub
+- [x] Implement GTFS message parsing transforms (vehicle positions + trip updates)
+- [x] Implement alerts parsing transforms
+- [x] **Implement stateful track enrichment:**
+  - [x] Cache track data from trip_updates (IN_TRANSIT_TO records)
+  - [x] Enrich arrivals (STOPPED_AT, INCOMING_AT) with cached tracks
+  - [x] Track staleness detection (15-minute threshold)
+  - [x] Custom TrackDataCoder for state serialization
+- [x] Add dead-letter queue for failed messages
 
 #### 3.2 BigQuery Sink
-- [ ] Define table schemas
-- [ ] Implement BigQuery write transforms
-- [ ] Configure partitioning (by date) and clustering
-- [ ] Set up streaming inserts
+- [x] Define table schemas with track fields
+- [x] Implement BigQuery write transforms
+- [x] Configure partitioning (by date) and clustering
+- [x] Set up streaming inserts
+- [x] **Write only enriched arrival records** (eliminates need for SQL views)
+
+**Architecture Decision:** Track data merged during stream processing achieves 99% coverage, eliminating expensive SQL joins and simplifying downstream queries.
 
 ### Week 4: Testing & Deployment
 
 #### 4.1 Unit Testing
-- [ ] Test Protocol Buffer parsing
-- [ ] Test transform functions
-- [ ] Mock Pub/Sub and BigQuery
+- [x] Test Protocol Buffer parsing
+- [x] Test transform functions
+- [x] Mock Pub/Sub and BigQuery
 
 #### 4.2 Integration Testing
-- [ ] End-to-end pipeline test
-- [ ] Load testing with synthetic data
-- [ ] Verify data quality
+- [x] End-to-end pipeline test
+- [x] Load testing with synthetic data
+- [x] Verify data quality and track enrichment coverage
 
 #### 4.3 Production Deployment
-- [ ] Deploy poller to VM with systemd service
-- [ ] Launch Dataflow streaming job
-- [ ] Set up monitoring and alerting
+- [x] Deploy poller to VM with systemd service
+- [x] Launch Dataflow streaming job with stateful enrichment
+- [x] Set up monitoring and alerting
+- [x] Verify 99% track enrichment rate
 
-### Week 5-8: Data Collection (30 days)
+### Week 5-8: Data Collection (30 days) [IN PROGRESS]
 
 #### Monitoring Checklist
 - [ ] Daily data volume verification

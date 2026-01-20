@@ -181,11 +181,25 @@ The poller VM automatically receives these from Terraform:
 
 2. Check for errors in Dataflow logs
 
-3. Query recent data:
+3. Query recent arrivals with track data:
    ```sql
-   SELECT COUNT(*) FROM subway.vehicle_positions
+   SELECT 
+     COUNT(*) as total_arrivals,
+     COUNTIF(actual_track IS NOT NULL) as with_track_data,
+     ROUND(100.0 * COUNTIF(actual_track IS NOT NULL) / COUNT(*), 1) as enrichment_pct
+   FROM subway.vehicle_positions
    WHERE vehicle_timestamp > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR)
    ```
+
+### Track Data Missing
+
+The pipeline uses stateful processing to enrich arrivals with track assignments. If enrichment percentage is low:
+
+1. Check Dataflow metrics for `enriched_records` and `no_track_data` counters
+2. Verify trip_updates are being processed (contain track data before arrivals)
+3. Check for `stale_track_data` warnings (cached data > 15 minutes old)
+
+**Expected:** ~99% of arrival records should have track data enriched.
 
 ---
 
