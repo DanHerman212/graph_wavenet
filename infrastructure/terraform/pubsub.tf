@@ -53,20 +53,15 @@ resource "google_pubsub_topic" "service_alerts" {
   depends_on = [google_project_service.apis]
 }
 
-# Subscription for GTFS-RT ACE messages (consumed by Dataflow)
-# Note: Dataflow handles its own deduplication and retry logic
+# Subscription for GTFS-RT ACE messages (consumed by Dataflow with stateful enrichment)
 resource "google_pubsub_subscription" "gtfs_rt" {
   name  = "gtfs-rt-ace-dataflow"
   topic = google_pubsub_topic.gtfs_rt.id
 
-  # 7 days retention
   message_retention_duration = "604800s"
   retain_acked_messages      = false
+  ack_deadline_seconds       = 60
 
-  # Acknowledgement deadline
-  ack_deadline_seconds = 60
-
-  # Expiration policy (never expire)
   expiration_policy {
     ttl = ""
   }
@@ -74,22 +69,19 @@ resource "google_pubsub_subscription" "gtfs_rt" {
   labels = {
     environment = var.environment
     consumer    = "dataflow"
+    pipeline    = "stateful-enrichment"
   }
 }
 
-# Subscription for GTFS-RT BDFM messages (consumed by Dataflow)
+# Subscription for GTFS-RT BDFM messages (consumed by Dataflow with stateful enrichment)
 resource "google_pubsub_subscription" "gtfs_rt_bdfm" {
   name  = "gtfs-rt-bdfm-dataflow"
   topic = google_pubsub_topic.gtfs_rt_bdfm.id
 
-  # 7 days retention
   message_retention_duration = "604800s"
   retain_acked_messages      = false
+  ack_deadline_seconds       = 60
 
-  # Acknowledgement deadline
-  ack_deadline_seconds = 60
-
-  # Expiration policy (never expire)
   expiration_policy {
     ttl = ""
   }
@@ -97,19 +89,18 @@ resource "google_pubsub_subscription" "gtfs_rt_bdfm" {
   labels = {
     environment = var.environment
     consumer    = "dataflow"
+    pipeline    = "stateful-enrichment"
   }
 }
 
 # Subscription for Service Alerts (consumed by Dataflow)
-# Note: Dataflow handles its own deduplication and retry logic
 resource "google_pubsub_subscription" "service_alerts" {
   name  = "service-alerts-dataflow"
   topic = google_pubsub_topic.service_alerts.id
 
   message_retention_duration = "604800s"
   retain_acked_messages      = false
-
-  ack_deadline_seconds = 60
+  ack_deadline_seconds       = 60
 
   expiration_policy {
     ttl = ""
@@ -118,6 +109,7 @@ resource "google_pubsub_subscription" "service_alerts" {
   labels = {
     environment = var.environment
     consumer    = "dataflow"
+    pipeline    = "stateful-enrichment"
   }
 }
 
@@ -138,70 +130,6 @@ resource "google_pubsub_subscription" "dead_letter" {
   labels = {
     environment = var.environment
     purpose     = "monitoring"
-  }
-}
-
-# =============================================================================
-# TEST SUBSCRIPTIONS - For testing stateful enrichment pipeline in parallel
-# =============================================================================
-
-# Test subscription for GTFS-RT ACE messages
-resource "google_pubsub_subscription" "gtfs_rt_test" {
-  name  = "gtfs-rt-ace-dataflow-test"
-  topic = google_pubsub_topic.gtfs_rt.id
-
-  message_retention_duration = "604800s"
-  retain_acked_messages      = false
-  ack_deadline_seconds       = 60
-
-  expiration_policy {
-    ttl = ""
-  }
-
-  labels = {
-    environment = var.environment
-    consumer    = "dataflow-test"
-    purpose     = "testing-stateful-enrichment"
-  }
-}
-
-# Test subscription for GTFS-RT BDFM messages
-resource "google_pubsub_subscription" "gtfs_rt_bdfm_test" {
-  name  = "gtfs-rt-bdfm-dataflow-test"
-  topic = google_pubsub_topic.gtfs_rt_bdfm.id
-
-  message_retention_duration = "604800s"
-  retain_acked_messages      = false
-  ack_deadline_seconds       = 60
-
-  expiration_policy {
-    ttl = ""
-  }
-
-  labels = {
-    environment = var.environment
-    consumer    = "dataflow-test"
-    purpose     = "testing-stateful-enrichment"
-  }
-}
-
-# Test subscription for Service Alerts
-resource "google_pubsub_subscription" "service_alerts_test" {
-  name  = "service-alerts-dataflow-test"
-  topic = google_pubsub_topic.service_alerts.id
-
-  message_retention_duration = "604800s"
-  retain_acked_messages      = false
-  ack_deadline_seconds       = 60
-
-  expiration_policy {
-    ttl = ""
-  }
-
-  labels = {
-    environment = var.environment
-    consumer    = "dataflow-test"
-    purpose     = "testing-stateful-enrichment"
   }
 }
 

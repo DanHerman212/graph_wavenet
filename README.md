@@ -32,13 +32,16 @@ Headway prediction enables:
 
 ### Phase 2: Create a Data Representation
 
-**Goal:** Build a streaming ingestion pipeline to capture GTFS real-time subway data and service alerts.
+**Goal:** Build a streaming ingestion pipeline to capture GTFS real-time subway data with stateful track enrichment.
 
 The pipeline captures:
-- **Vehicle positions** - Real-time train locations, updated every 30 seconds
+- **Vehicle positions** - Real-time train locations and arrivals, updated every 30 seconds
+- **Track assignments** - Platform tracks enriched via stateful processing (eliminates need for SQL joins)
 - **Service alerts** - Delays, planned work, and service changes affecting A/C/E lines
 
-Data flows from MTA feeds → Pub/Sub → Dataflow → BigQuery for training dataset construction.
+Data flows from MTA feeds → Pub/Sub → Dataflow (with stateful enrichment) → BigQuery for training dataset construction.
+
+**Key Innovation:** Track data from trip_updates is cached in-memory and enriched into arrival records (STOPPED_AT, INCOMING_AT) during stream processing, achieving 99% track coverage without post-processing SQL views.
 
 ### Phase 3: Build Graph WaveNet Architecture
 
@@ -81,11 +84,11 @@ flowchart LR
     subgraph Ingestion["Ingestion Layer"]
         VM[GCE VM<br/>Pollers]
         PS[Pub/Sub<br/>Topics]
-        DF[Dataflow<br/>Streaming]
+        DF[Dataflow<br/>Stateful Enrichment]
     end
 
     subgraph Storage["Data Warehouse"]
-        BQ[(BigQuery)]
+        BQ[(BigQuery<br/>Enriched Arrivals)]
     end
 
     subgraph ML["Machine Learning"]
@@ -107,6 +110,13 @@ flowchart LR
     API --> DJ
     BQ --> DJ
 ```
+
+### Pipeline Features
+
+- **Stateful Processing**: Dataflow caches track assignments from trip_updates and enriches arrival records in real-time
+- **Arrival-Only Output**: Only writes STOPPED_AT and INCOMING_AT records with enriched track data (99% coverage)
+- **No SQL Views Needed**: Track data pre-merged during streaming, eliminating expensive joins
+- **Automatic Staleness Detection**: Warns if cached track data exceeds 15-minute threshold
 
 📘 **[Ingestion Operations Guide](docs/operations_guide.md)** - Deployment commands, workflows, and troubleshooting
 
@@ -138,13 +148,14 @@ graph_wavenet/
 │   │   ├── main.py             # Concurrent polling entrypoint
 │   │   └── requirements.txt
 │   │
-│   └── dataflow/               # Stream processing
-│       ├── pipeline.py         # Apache Beam pipeline
+│   └── dataflow/               # Stream processing with stateful enrichment
+│       ├── pipeline.py         # Apache Beam pipeline with track caching
+│       ├── setup.py            # Module packaging for Dataflow workers
 │       ├── transforms/
-│       │   ├── parse_gtfs.py   # Extract vehicle positions
+│       │   ├── parse_gtfs.py   # Extract vehicle positions and trip updates
 │       │   └── parse_alerts.py # Extract A/C/E alerts
 │       └── schemas/
-│           └── __init__.py     # BigQuery schemas
+│           └── bigquery_schemas.py  # BigQuery table schemas
 │
 ├── model/                      # Graph WaveNet implementation
 │   ├── graph_wavenet.py        # Model architecture
@@ -166,7 +177,7 @@ graph_wavenet/
 
 ### Vehicle Positions Table
 
-Captures real-time train locations, polled every 30 seconds.
+Captures real-time train arrivals with enriched track data. Track assignments are merged from trip_updates during stream processing, eliminating the need for SQL joins.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -175,11 +186,16 @@ Captures real-time train locations, polled every 30 seconds.
 | `route_id` | STRING | Route (A, C, E, H) |
 | `direction` | STRING | N (northbound) or S (southbound) |
 | `path_id` | STRING | Path identifier (e.g., 55R) |
+| `train_id` | STRING | Physical train identifier |
+| `scheduled_track` | STRING | **Pre-planned track** (e.g., F3, A2) - enriched via stateful processing |
+| `actual_track` | STRING | **Real-time track** (e.g., F3, A2) - enriched via stateful processing |
 | `stop_id` | STRING | Current station |
-| `current_status` | STRING | STOPPED_AT, INCOMING_AT, IN_TRANSIT_TO |
+| `current_status` | STRING | **STOPPED_AT** (train at platform), **INCOMING_AT** (approaching) |
 | `vehicle_timestamp` | TIMESTAMP | When train reported position |
 | `feed_timestamp` | TIMESTAMP | When MTA generated feed |
 | `ingest_time` | TIMESTAMP | When we received it |
+
+**Note:** Table only contains arrival records (STOPPED_AT, INCOMING_AT) with track data already merged. 99% of records have track coverage thanks to stateful enrichment.
 
 ### Service Alerts Table
 
